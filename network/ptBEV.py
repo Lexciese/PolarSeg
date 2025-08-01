@@ -6,7 +6,6 @@ import torch.nn.functional as F
 import numpy as np
 import numba as nb
 import multiprocessing
-import torch_scatter
 
 class ptBEVnet(nn.Module):
     
@@ -62,6 +61,11 @@ class ptBEVnet(nn.Module):
             self.pt_fea_dim = self.fea_compre
         else:
             self.pt_fea_dim = self.pool_dim
+    
+    def scatter_max(src, index, dim=-1, dim_size=None):
+        return torch.scatter_reduce(
+            src, dim=dim, index=index, reduce='amax', include_self=False, output_size=dim_size, return_inverse=False
+        )
         
     def forward(self, pt_fea, xy_ind, voxel_fea=None):
         cur_dev = pt_fea[0].get_device()
@@ -119,7 +123,7 @@ class ptBEVnet(nn.Module):
             processed_cat_pt_fea = self.PPmodel(cat_pt_fea)
         
         if self.pt_pooling == 'max':
-            pooled_data = torch_scatter.scatter_max(processed_cat_pt_fea, unq_inv, dim=0)[0]
+            pooled_data = self.scatter_max(processed_cat_pt_fea, unq_inv, dim=0)[0]
         else: raise NotImplementedError
         
         if self.fea_compre:
